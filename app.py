@@ -5,14 +5,44 @@ Streamlit App for Football Match & Player Analysis
 import streamlit as st
 import matplotlib.pyplot as plt
 import pandas as pd
+import gzip
 import json
+import os
 import sys
 from pathlib import Path
+
+APP_DIR = os.path.realpath(Path(__file__).parent)
+
+
+def _source_signature(path):
+    try:
+        stat = os.stat(path)
+        return stat.st_mtime_ns, stat.st_size
+    except OSError:
+        return None
+
+
+def _project_modules():
+    """This app's own imported modules (not this script itself or installed packages)"""
+    for name, module in list(sys.modules.items()):
+        path = os.path.realpath(getattr(module, '__file__', None) or '/')
+        if name not in ('__main__', __name__) and path.startswith(APP_DIR + os.sep) \
+                and 'site-packages' not in path:
+            yield name, module
+
+
+# Streamlit Community Cloud re-runs this script after a git push but keeps the app's other
+# modules loaded from before, so new app code would run against old modules until a reboot.
+# When any of their files changed, unload them all so they're imported fresh below.
+if any(getattr(m, '_source_signature', None) != _source_signature(m.__file__)
+       for _, m in _project_modules()):
+    for _name, _ in list(_project_modules()):
+        del sys.modules[_name]
 
 # Add scout report to path
 sys.path.insert(0, str(Path(__file__).parent / 'opta_scout_report' / 'src'))
 
-from opta_api import OptaAPI, EventProcessor, ConfigLoader, PassingNetworkBuilder, RateLimitError
+from opta_api import OptaAPI, EventProcessor, ConfigLoader, PassingNetworkBuilder, RateLimitError, SNAPSHOT_DIR
 from player_viz import PlayerDataAggregator, PlayerShotMap, PlayerPassMap, PlayerHeatMap, PlayerProfile
 from pitch_viz import ShotMap, PassingNetwork
 from match_overview import MatchOverview
@@ -35,6 +65,11 @@ try:
 except ImportError as e:
     SCOUT_REPORT_AVAILABLE = False
     SCOUT_IMPORT_ERROR = str(e)
+
+# Record what each project module was loaded from (see the unloading above)
+for _, _module in _project_modules():
+    if not hasattr(_module, '_source_signature'):
+        _module._source_signature = _source_signature(_module.__file__)
 
 # Page config
 st.set_page_config(
@@ -83,6 +118,28 @@ def fetch_match_events(_api, match_id):
 def fetch_match_stats(_api, match_id):
     """Cache match stats for 1 hour"""
     return _api.get_match_stats(match_id)
+
+
+@st.cache_data(ttl=600)
+def bundled_seasons():
+    """Seasons with matches in snapshots/ as (name, matches bundled, last match date)"""
+    bundled = {p.name.split('.')[0] for p in (SNAPSHOT_DIR / 'matchevent').glob('*.json.gz')}
+    seasons = []
+    for path in sorted((SNAPSHOT_DIR / 'match').glob('*.json.gz')):
+        matches = json.loads(gzip.decompress(path.read_bytes())).get('match', [])
+        dates = [m['matchInfo'].get('date', '')[:10] for m in matches if m['matchInfo']['id'] in bundled]
+        if dates:
+            info = matches[0]['matchInfo']
+            seasons.append((f"{info['competition']['name']} {info['tournamentCalendar']['name']}",
+                            len(dates), max(dates)))
+    return seasons
+
+
+def bundled_seasons_text():
+    seasons = bundled_seasons()
+    if not seasons:
+        return "none found on this server"
+    return "; ".join(f"{name}: {count} matches through {last}" for name, count, last in seasons)
 
 
 @st.cache_data(ttl=3600)
@@ -152,6 +209,8 @@ def main():
             help="Create one on a computer that can reach the feed with: "
                  "python download_match.py <match URL>"
         )
+
+        st.caption(f"Bundled data (loads without the live feed): {bundled_seasons_text()}")
 
         st.divider()
 
@@ -290,9 +349,13 @@ def show_match_page(api, match_id, preloaded=None):
             return
 
     except RateLimitError:
-        st.error("Live data for this match is unavailable: the Opta feed is rate limiting this "
-                 "server. Matches bundled with the app still load, and you can upload a match "
-                 "file from download_match.py in the sidebar.")
+        if (SNAPSHOT_DIR / 'matchevent' / f'{match_id}.json.gz').exists():
+            st.error("This match is bundled with the app, but the server didn't use the bundled "
+                     "data. Reboot the app so it loads the current code.")
+        else:
+            st.error("This match isn't in the app's bundled data, and the Opta feed is rate "
+                     "limiting this server, so it can't be loaded live right now. You can upload "
+                     f"a match file from download_match.py in the sidebar. Bundled: {bundled_seasons_text()}.")
         return
     except Exception as e:
         st.error(f"Error fetching match data: {str(e)}")
@@ -335,8 +398,8 @@ def show_player_season_analysis(api, player_id, team_id, tournament_id):
         with st.spinner("Loading season matches..."):
             team_matches = fetch_team_matches(api, team_id, tournament_id)
     except RateLimitError:
-        st.error("Live data for this team is unavailable: the Opta feed is rate limiting this "
-                 "server. Teams and matches bundled with the app still load.")
+        st.error("This team's season isn't in the app's bundled data, and the Opta feed is rate "
+                 f"limiting this server, so it can't be loaded live right now. Bundled: {bundled_seasons_text()}.")
         return
     except Exception as e:
         st.error(f"Error loading player data: {e}")
