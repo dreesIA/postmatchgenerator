@@ -8,9 +8,14 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import numpy as np
 import json
+import time
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
+
+
+class RateLimitError(Exception):
+    """Raised when the Opta feed keeps returning HTTP 429 after retries"""
 
 
 @dataclass
@@ -284,7 +289,30 @@ class OptaAPI:
         end = text.rfind(')')
         json_str = text[start:end]
         return json.loads(json_str)
-    
+
+    def _fetch(self, url: str, params: dict, max_retries: int = 3) -> dict:
+        """GET a feed URL and parse it, retrying with backoff when rate limited (429)"""
+        for attempt in range(max_retries + 1):
+            response = self.session.get(url, params=params, timeout=30)
+            # The feed reports errors either as a real HTTP status or inside a 200 body
+            rate_limited = response.status_code == 429
+            data = None
+            if not rate_limited:
+                response.raise_for_status()
+                data = self._parse_jsonp(response.text)
+                rate_limited = str(data.get('httpStatus')) == '429'
+            if not rate_limited:
+                return data
+            if attempt < max_retries:
+                retry_after = response.headers.get('Retry-After', '')
+                delay = int(retry_after) if retry_after.isdigit() else 2 ** (attempt + 1)
+                time.sleep(min(delay, 30))
+
+        raise RateLimitError(
+            "The Opta feed is rate limiting requests from this server (HTTP 429). "
+            "Wait a few minutes and try again."
+        )
+
     def _make_request(self, endpoint: str, params: dict = None) -> dict:
         """Make API request and parse response"""
         if params is None:
@@ -299,10 +327,7 @@ class OptaAPI:
         })
         
         url = f"{self.BASE_URL}/{endpoint}/{self.outlet_key}"
-        response = self.session.get(url, params=params)
-        response.raise_for_status()
-        
-        return self._parse_jsonp(response.text)
+        return self._fetch(url, params)
     
     def get_match_events(self, match_id: str) -> Tuple[pd.DataFrame, MatchInfo]:
         """
@@ -322,10 +347,10 @@ class OptaAPI:
             '_clbk': 'callback'
         }
         
-        response = self.session.get(url, params=params)
-        data = self._parse_jsonp(response.text)
+        data = self._fetch(url, params)
 
         # The feed returns HTTP 200 with an error body when the match can't be served
+        # (rate limiting is retried and raised separately in _fetch)
         if 'errorCode' in data:
             raise ValueError(
                 f"Opta feed returned error {data.get('errorCode')} (HTTP {data.get('httpStatus')}) "
@@ -386,8 +411,7 @@ class OptaAPI:
             '_clbk': 'callback'
         }
         
-        response = self.session.get(url, params=params)
-        return self._parse_jsonp(response.text)
+        return self._fetch(url, params)
     
     def get_matches_by_tournament(self, tournament_id: str = None, page_size: int = 400) -> pd.DataFrame:
         """
@@ -417,8 +441,7 @@ class OptaAPI:
             '_clbk': 'callback'
         }
         
-        response = self.session.get(url, params=params)
-        data = self._parse_jsonp(response.text)
+        data = self._fetch(url, params)
         
         matches = data.get('match', [])
         return pd.json_normalize(matches)
@@ -445,8 +468,7 @@ class OptaAPI:
             '_clbk': 'callback'
         }
         
-        response = self.session.get(url, params=params)
-        data = self._parse_jsonp(response.text)
+        data = self._fetch(url, params)
         
         squad = data.get('squad', [{}])[0]
         players = squad.get('person', [])
@@ -473,8 +495,7 @@ class OptaAPI:
             '_clbk': 'callback'
         }
         
-        response = self.session.get(url, params=params)
-        data = self._parse_jsonp(response.text)
+        data = self._fetch(url, params)
         
         # Navigate to rankings
         stages = data.get('stage', [])

@@ -79,6 +79,12 @@ def fetch_match_events(_api, match_id):
 
 
 @st.cache_data(ttl=3600)
+def fetch_match_stats(_api, match_id):
+    """Cache match stats for 1 hour"""
+    return _api.get_match_stats(match_id)
+
+
+@st.cache_data(ttl=3600)
 def fetch_tournament_matches(_api, tournament_id):
     """Cache tournament matches for 1 hour"""
     return _api.get_matches_by_tournament(tournament_id)
@@ -553,7 +559,7 @@ def show_match_overview(api, events_df, match_info, match_id):
         with st.spinner("Generating match overview... This may take a moment."):
             try:
                 # Fetch match stats for accurate possession data
-                match_stats = api.get_match_stats(match_id)
+                match_stats = fetch_match_stats(api, match_id)
 
                 # Create the match overview with real stats
                 overview = MatchOverview(events_df, match_info, match_stats)
@@ -713,7 +719,7 @@ def show_phase_report(api, events_df, match_info, match_id):
         with st.spinner("Generating phase analysis... This may take a moment."):
             try:
                 # Fetch match stats
-                match_stats = api.get_match_stats(match_id)
+                match_stats = fetch_match_stats(api, match_id)
 
                 # Create the phase report
                 report = FullPhaseReport(events_df, match_info, match_stats)
