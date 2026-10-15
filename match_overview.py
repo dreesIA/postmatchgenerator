@@ -198,6 +198,11 @@ class MatchOverview:
         ax.text(0.5, 0.5, f"{self.match_info.home_score} - {self.match_info.away_score}",
                 fontsize=42, fontweight='bold', color=TEXT_COLOR,
                 ha='center', va='center', transform=ax.transAxes)
+        home_pens = getattr(self.match_info, 'home_pens', None)
+        if home_pens is not None:
+            ax.text(0.5, 0.05, f"({home_pens} - {self.match_info.away_pens} pens)",
+                    fontsize=14, color=TEXT_SECONDARY,
+                    ha='center', va='center', transform=ax.transAxes)
 
         # Away team (right)
         ax.text(0.75, 0.5, self.match_info.away_team_name,

@@ -104,6 +104,8 @@ class MatchInfo:
     away_score: int
     status: str = ''
     coverage_level: str = ''
+    home_pens: Optional[int] = None    # shootout score, when there was one
+    away_pens: Optional[int] = None
 
 
 class OptaAPI:
@@ -441,8 +443,10 @@ class OptaAPI:
         home_team = next((c for c in contestants if c.get('position') == 'home'), {})
         away_team = next((c for c in contestants if c.get('position') == 'away'), {})
         
-        scores = data.get('liveData', {}).get('matchDetails', {}).get('scores', {}).get('total', {})
-        
+        scores = data.get('liveData', {}).get('matchDetails', {}).get('scores', {})
+        # The feed's 'total' adds shootout penalties to the goals
+        total, pens = scores.get('total', {}), scores.get('pen', {})
+
         match_info = MatchInfo(
             match_id=match_id,
             home_team_id=home_team.get('id', ''),
@@ -452,10 +456,12 @@ class OptaAPI:
             competition=match_info_raw.get('competition', {}).get('name', ''),
             date=match_info_raw.get('date', ''),
             venue=match_info_raw.get('venue', {}).get('longName', ''),
-            home_score=scores.get('home', 0),
-            away_score=scores.get('away', 0),
+            home_score=total.get('home', 0) - pens.get('home', 0),
+            away_score=total.get('away', 0) - pens.get('away', 0),
             status=data.get('liveData', {}).get('matchDetails', {}).get('matchStatus', ''),
-            coverage_level=match_info_raw.get('coverageLevel', '')
+            coverage_level=match_info_raw.get('coverageLevel', ''),
+            home_pens=pens.get('home'),
+            away_pens=pens.get('away')
         )
 
         # Extract events

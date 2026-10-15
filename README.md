@@ -9,7 +9,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Paste a Scoresway match, team, or player URL in the sidebar.
+Choose a season, team, and match in the sidebar, or paste a Scoresway match, team, or player URL.
 
 ## Bundled data
 

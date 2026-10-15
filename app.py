@@ -33,11 +33,14 @@ def _project_modules():
 
 # Streamlit Community Cloud re-runs this script after a git push but keeps the app's other
 # modules loaded from before, so new app code would run against old modules until a reboot.
-# When any of their files changed, unload them all so they're imported fresh below.
+# When any of their files changed, unload them all so they're imported fresh below, and
+# drop cached results the old code produced.
 if any(getattr(m, '_source_signature', None) != _source_signature(m.__file__)
        for _, m in _project_modules()):
     for _name, _ in list(_project_modules()):
         del sys.modules[_name]
+    st.cache_data.clear()
+    st.cache_resource.clear()
 
 # Add scout report to path
 sys.path.insert(0, str(Path(__file__).parent / 'opta_scout_report' / 'src'))
@@ -122,24 +125,107 @@ def fetch_match_stats(_api, match_id):
 
 @st.cache_data(ttl=600)
 def bundled_seasons():
-    """Seasons with matches in snapshots/ as (name, matches bundled, last match date)"""
+    """Seasons with matches in snapshots/, newest first, as dicts of
+    tournament_id, name, matches (number bundled), and last (date of the last one)"""
     bundled = {p.name.split('.')[0] for p in (SNAPSHOT_DIR / 'matchevent').glob('*.json.gz')}
     seasons = []
-    for path in sorted((SNAPSHOT_DIR / 'match').glob('*.json.gz')):
+    for path in (SNAPSHOT_DIR / 'match').glob('*.json.gz'):
         matches = json.loads(gzip.decompress(path.read_bytes())).get('match', [])
         dates = [m['matchInfo'].get('date', '')[:10] for m in matches if m['matchInfo']['id'] in bundled]
         if dates:
             info = matches[0]['matchInfo']
-            seasons.append((f"{info['competition']['name']} {info['tournamentCalendar']['name']}",
-                            len(dates), max(dates)))
-    return seasons
+            seasons.append({
+                'tournament_id': info['tournamentCalendar']['id'],
+                'name': f"{info['competition']['name']} {info['tournamentCalendar']['name']}",
+                'matches': len(dates),
+                'last': max(dates),
+            })
+    return sorted(seasons, key=lambda s: s['last'], reverse=True)
 
 
 def bundled_seasons_text():
     seasons = bundled_seasons()
     if not seasons:
         return "none found on this server"
-    return "; ".join(f"{name}: {count} matches through {last}" for name, count, last in seasons)
+    return "; ".join(f"{s['name']}: {s['matches']} matches through {s['last']}" for s in seasons)
+
+
+FINISHED_STATUSES = ['Played', 'Awarded']
+
+
+def match_label(match, team_id):
+    """Dropdown label for a match from one team's side, e.g. 'Oct 10 · vs Hartford Athletic · W 2–1'"""
+    contestants = match['matchInfo.contestant']
+    home = next((c for c in contestants if c.get('position') == 'home'), contestants[0])
+    away = next((c for c in contestants if c.get('position') == 'away'), contestants[-1])
+    is_home = home['id'] == team_id
+    day = pd.Timestamp(match['matchInfo.localDate'])
+    label = f"{day:%b} {day.day} · {'vs' if is_home else 'at'} {(away if is_home else home)['name']}"
+
+    def score(kind, side):
+        value = match.get(f'liveData.matchDetails.scores.{kind}.{side}')
+        return None if pd.isna(value) else int(value)
+
+    home_total, away_total = score('total', 'home'), score('total', 'away')
+    if home_total is not None and away_total is not None:
+        # The feed's 'total' adds shootout penalties to the goals
+        home_pens, away_pens = score('pen', 'home'), score('pen', 'away')
+        ours, theirs = (home_total, away_total) if is_home else (away_total, home_total)
+        if home_pens is None:
+            result = 'W' if ours > theirs else 'L' if ours < theirs else 'D'
+            label += f" · {result} {ours}–{theirs}"
+        else:
+            our_pens, their_pens = (home_pens, away_pens) if is_home else (away_pens, home_pens)
+            result = 'W' if our_pens > their_pens else 'L'
+            label += (f" · {result} {ours - our_pens}–{theirs - their_pens} "
+                      f"({our_pens}–{their_pens} pens)")
+
+    stage = match.get('matchInfo.stage.name')
+    if isinstance(stage, str) and stage != 'Regular Season':
+        label += f" · {stage}"
+    return label
+
+
+def _reset_widgets(*keys):
+    for key in keys:
+        st.session_state[key] = None
+
+
+def _clear_url():
+    st.session_state['url_input'] = ''
+
+
+def pick_bundled_match():
+    """Season, team, and match dropdowns over the bundled seasons; returns the chosen match ID"""
+    seasons = bundled_seasons()
+    if not seasons:
+        return None
+
+    season_names = {s['tournament_id']: s['name'] for s in seasons}
+    season_id = st.selectbox(
+        "Season", list(season_names), format_func=season_names.get, key='pick_season',
+        on_change=_reset_widgets, args=('pick_team', 'pick_match')
+    )
+
+    matches = fetch_tournament_matches(OptaAPI(), season_id)
+    matches = matches[matches['liveData.matchDetails.matchStatus'].isin(FINISHED_STATUSES)]
+    team_names = {c['id']: c['name'] for contestants in matches['matchInfo.contestant'] for c in contestants}
+    team_id = st.selectbox(
+        "Team", sorted(team_names, key=team_names.get), format_func=team_names.get,
+        index=None, placeholder="Choose a team", key='pick_team',
+        on_change=_reset_widgets, args=('pick_match',)
+    )
+    if team_id is None:
+        return None
+
+    played = matches[matches['matchInfo.contestant'].apply(lambda cs: any(c['id'] == team_id for c in cs))]
+    played = played.sort_values('matchInfo.date', ascending=False)
+    labels = {m['matchInfo.id']: match_label(m, team_id) for _, m in played.iterrows()}
+    return st.selectbox(
+        "Match", list(labels), format_func=labels.get,
+        index=None, placeholder=f"Choose one of {len(labels)} matches", key='pick_match',
+        on_change=_clear_url
+    )
 
 
 @st.cache_data(ttl=3600)
@@ -183,12 +269,21 @@ def main():
     with st.sidebar:
         st.header("Configuration")
 
-        # URL input - primary method
-        st.subheader("Paste Scoresway URL")
+        # Match picker - every finished match in the bundled seasons
+        st.subheader("Find a match")
+        picked_match_id = pick_bundled_match()
+        st.caption(f"Bundled data (loads without the live feed): {bundled_seasons_text()}")
+
+        st.divider()
+
+        # URL input - for players, teams, and matches outside the bundled seasons
+        st.subheader("Or paste a Scoresway URL")
         url_input = st.text_input(
             "Scoresway URL",
             placeholder="https://www.scoresway.com/...",
-            help="Paste a match or player URL from Scoresway"
+            help="Paste a match, team, or player URL from Scoresway",
+            key='url_input',
+            on_change=_reset_widgets, args=('pick_match',)
         )
 
         # Parse URL if provided
@@ -210,37 +305,33 @@ def main():
                  "python download_match.py <match URL>"
         )
 
-        st.caption(f"Bundled data (loads without the live feed): {bundled_seasons_text()}")
-
-        st.divider()
-
-        # League selection
-        config = get_config_loader()
-        leagues = config.list_leagues()
-        league_names = {key: config.get_league(key).name for key in leagues}
-
-        selected_league_key = st.selectbox(
-            "Select League",
-            options=leagues,
-            format_func=lambda x: league_names[x]
-        )
-
-        league_config = config.get_league(selected_league_key)
-        st.caption(f"Season: {league_config.season}")
-
-        # Initialize API
-        api = OptaAPI.for_league(selected_league_key)
-
         st.divider()
 
         # Manual ID inputs (as fallback)
         with st.expander("Manual ID Entry"):
+            # League selection sets the season for team and player IDs
+            config = get_config_loader()
+            leagues = config.list_leagues()
+            league_names = {key: config.get_league(key).name for key in leagues}
+
+            selected_league_key = st.selectbox(
+                "Select League",
+                options=leagues,
+                format_func=lambda x: league_names[x]
+            )
+
+            league_config = config.get_league(selected_league_key)
+            st.caption(f"Season: {league_config.season}")
+
             manual_match_id = st.text_input("Match ID", placeholder="e.g., 19a81k01783lyow7nexg2c844")
             manual_team_id = st.text_input("Team ID", placeholder="e.g., e3k8yw2rbmphyfu5htn4yi5jk")
             manual_player_id = st.text_input("Player ID", placeholder="e.g., caoq1dpq6lz1btrd75s9xuz56")
 
+        # Initialize API
+        api = OptaAPI.for_league(selected_league_key)
+
         # Determine what IDs we have
-        match_id = parsed_ids.get('match_id') or manual_match_id
+        match_id = parsed_ids.get('match_id') or picked_match_id or manual_match_id
         team_id = parsed_ids.get('team_id') or manual_team_id
         player_id = parsed_ids.get('player_id') or manual_player_id
         tournament_id = parsed_ids.get('tournament_id') or league_config.tournament_id
@@ -269,7 +360,8 @@ def main():
 
 def show_landing_page():
     """Show instructions when no IDs are provided"""
-    st.info("👈 Paste a Scoresway URL in the sidebar to get started")
+    st.info("👈 Choose a season, team, and match in the sidebar to get started, "
+            "or paste a Scoresway URL for player and team pages")
 
     col1, col2 = st.columns(2)
 
@@ -367,6 +459,9 @@ def show_match_page(api, match_id, preloaded=None):
         st.markdown(f"### {match_info.home_team_name}")
     with col2:
         st.markdown(f"### {match_info.home_score} - {match_info.away_score}")
+        home_pens = getattr(match_info, 'home_pens', None)
+        if home_pens is not None:
+            st.caption(f"{home_pens} - {match_info.away_pens} on penalties")
     with col3:
         st.markdown(f"### {match_info.away_team_name}")
 
