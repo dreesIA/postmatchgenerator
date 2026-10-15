@@ -230,7 +230,15 @@ def show_match_page(api, match_id):
             events_df, match_info = fetch_match_events(api, match_id)
 
         if len(events_df) == 0:
-            st.error("No data found for this match ID. Please check the ID and try again.")
+            if match_info.status and match_info.status != 'Played':
+                st.warning(f"This match has no event data yet (status: {match_info.status}). "
+                           "Event data is available once the match has been played.")
+            else:
+                teams = [t for t in (match_info.home_team_name, match_info.away_team_name) if t]
+                desc = f" ({' vs '.join(teams)})" if teams else ''
+                st.error(f"No event data found for this match{desc}. "
+                         f"Coverage level: {match_info.coverage_level or 'unknown'}. "
+                         "This competition may not include event-level data.")
             return
 
     except Exception as e:

@@ -89,6 +89,8 @@ class MatchInfo:
     venue: str
     home_score: int
     away_score: int
+    status: str = ''
+    coverage_level: str = ''
 
 
 class OptaAPI:
@@ -322,7 +324,15 @@ class OptaAPI:
         
         response = self.session.get(url, params=params)
         data = self._parse_jsonp(response.text)
-        
+
+        # The feed returns HTTP 200 with an error body when the match can't be served
+        if 'errorCode' in data:
+            raise ValueError(
+                f"Opta feed returned error {data.get('errorCode')} (HTTP {data.get('httpStatus')}) "
+                f"for match {match_id}. The match may not have been played yet, the ID may be "
+                f"wrong, or this competition isn't available with the current outlet key."
+            )
+
         # Extract match info
         match_info_raw = data.get('matchInfo', {})
         contestants = match_info_raw.get('contestant', [])
@@ -342,9 +352,11 @@ class OptaAPI:
             date=match_info_raw.get('date', ''),
             venue=match_info_raw.get('venue', {}).get('longName', ''),
             home_score=scores.get('home', 0),
-            away_score=scores.get('away', 0)
+            away_score=scores.get('away', 0),
+            status=data.get('liveData', {}).get('matchDetails', {}).get('matchStatus', ''),
+            coverage_level=match_info_raw.get('coverageLevel', '')
         )
-        
+
         # Extract events
         events = data.get('liveData', {}).get('event', [])
         events_df = pd.json_normalize(events)
