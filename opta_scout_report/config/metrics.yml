@@ -1,0 +1,560 @@
+# Metrics Configuration for Opta Scout Report
+# All metrics are computed per-90 unless otherwise specified
+
+version: "1.0"
+
+# Position group definitions
+position_groups:
+  GK:
+    positions: ["Goalkeeper"]
+    min_minutes: 450
+  CB:
+    positions: ["Defender", "Centre-Back", "Central Defender"]
+    min_minutes: 450
+  FB:
+    positions: ["Full-Back", "Left-Back", "Right-Back", "Wing-Back"]
+    min_minutes: 450
+  DM:
+    positions: ["Defensive Midfielder", "Holding Midfielder"]
+    min_minutes: 450
+  CM:
+    positions: ["Central Midfielder", "Midfielder"]
+    min_minutes: 450
+  AM:
+    positions: ["Attacking Midfielder", "Playmaker"]
+    min_minutes: 400
+  W:
+    positions: ["Winger", "Left Winger", "Right Winger", "Wide Midfielder"]
+    min_minutes: 400
+  ST:
+    positions: ["Striker", "Forward", "Centre-Forward"]
+    min_minutes: 350
+
+# Metric definitions
+metrics:
+  # Volume & Involvement
+  involvement:
+    touches:
+      description: "Total touches of the ball"
+      event_types: [1, 3, 13, 14, 15, 16, 44, 49, 50, 51, 52, 53, 54, 61, 74]
+      per_90: true
+    passes_received:
+      description: "Successful passes received from teammates"
+      calculation: "count passes where player is recipient"
+      per_90: true
+    progressive_passes_received:
+      description: "Progressive passes received"
+      per_90: true
+
+  # Passing
+  passing:
+    passes_attempted:
+      description: "Total passes attempted"
+      event_type: 1
+      per_90: true
+    passes_completed:
+      description: "Successful passes"
+      event_type: 1
+      outcome: 1
+      per_90: true
+    pass_accuracy:
+      description: "Pass completion percentage"
+      calculation: "passes_completed / passes_attempted * 100"
+      format: "percentage"
+    progressive_passes:
+      description: "Passes that move ball >= 10m toward goal"
+      threshold_meters: 10
+      per_90: true
+    line_breaking_passes:
+      description: "Passes that break defensive lines"
+      per_90: true
+    final_third_entries:
+      description: "Passes into the final third"
+      end_zone: "final_third"
+      per_90: true
+    penalty_area_entries:
+      description: "Passes into the penalty area"
+      end_zone: "box"
+      per_90: true
+    long_passes_attempted:
+      description: "Passes >= 25m"
+      min_distance: 25
+      per_90: true
+    long_pass_accuracy:
+      description: "Long pass completion percentage"
+      format: "percentage"
+    switches:
+      description: "Passes that switch play (>= 40m lateral)"
+      min_lateral: 40
+      per_90: true
+    through_balls:
+      description: "Through balls played"
+      qualifier: 4
+      per_90: true
+    crosses:
+      description: "Crosses attempted"
+      qualifier: 2
+      per_90: true
+    cross_accuracy:
+      description: "Cross completion percentage"
+      format: "percentage"
+
+  # Carrying & Dribbling
+  carrying:
+    carries:
+      description: "Total ball carries"
+      event_type: 3
+      per_90: true
+    progressive_carries:
+      description: "Carries that move ball >= 10m toward goal"
+      threshold_meters: 10
+      per_90: true
+    carry_distance:
+      description: "Total carry distance (meters)"
+      per_90: true
+    dribbles_attempted:
+      description: "Take-on attempts"
+      event_type: 3
+      per_90: true
+    dribble_success_rate:
+      description: "Successful take-on percentage"
+      format: "percentage"
+    dispossessions:
+      description: "Times dispossessed by opponent"
+      event_type: 50
+      per_90: true
+    miscontrols:
+      description: "Failed ball controls"
+      event_type: 51
+      per_90: true
+    carries_into_final_third:
+      description: "Carries ending in final third"
+      end_zone: "final_third"
+      per_90: true
+    carries_into_box:
+      description: "Carries ending in penalty area"
+      end_zone: "box"
+      per_90: true
+
+  # Chance Creation
+  chance_creation:
+    shots:
+      description: "Shots taken"
+      event_types: [13, 14, 15, 16]
+      per_90: true
+    shots_on_target:
+      description: "Shots on target"
+      per_90: true
+    goals:
+      description: "Goals scored"
+      event_type: 16
+      per_90: true
+    xG:
+      description: "Expected goals"
+      per_90: true
+    xG_per_shot:
+      description: "Average xG per shot"
+      calculation: "xG / shots"
+    npxG:
+      description: "Non-penalty expected goals"
+      per_90: true
+    assists:
+      description: "Assists"
+      per_90: true
+    xA:
+      description: "Expected assists"
+      per_90: true
+    key_passes:
+      description: "Passes leading to a shot"
+      per_90: true
+    shot_creating_actions:
+      description: "Actions leading to shot within 2 moves"
+      per_90: true
+    goal_creating_actions:
+      description: "Actions leading to goal within 2 moves"
+      per_90: true
+    big_chances_created:
+      description: "Big chances created for teammates"
+      per_90: true
+
+  # Defending
+  defending:
+    tackles:
+      description: "Tackles attempted"
+      event_type: 7
+      per_90: true
+    tackles_won:
+      description: "Successful tackles"
+      event_type: 7
+      outcome: 1
+      per_90: true
+    tackle_success_rate:
+      description: "Tackle success percentage"
+      format: "percentage"
+    interceptions:
+      description: "Interceptions"
+      event_type: 8
+      per_90: true
+    blocks:
+      description: "Shots and passes blocked"
+      event_type: 10
+      per_90: true
+    clearances:
+      description: "Clearances"
+      event_type: 12
+      per_90: true
+    aerial_duels:
+      description: "Aerial duels contested"
+      event_type: 44
+      per_90: true
+    aerial_duel_win_rate:
+      description: "Aerial duel success percentage"
+      format: "percentage"
+    pressures:
+      description: "Pressing actions"
+      per_90: true
+    pressure_success_rate:
+      description: "Successful pressure percentage"
+      format: "percentage"
+    defensive_actions:
+      description: "Total defensive actions (tackles + interceptions + blocks + clearances)"
+      per_90: true
+    ball_recoveries:
+      description: "Ball recoveries"
+      event_type: 49
+      per_90: true
+    defensive_third_pressures:
+      description: "Pressures in defensive third"
+      zone: "defensive_third"
+      per_90: true
+    middle_third_pressures:
+      description: "Pressures in middle third"
+      zone: "middle_third"
+      per_90: true
+    attacking_third_pressures:
+      description: "Pressures in attacking third"
+      zone: "attacking_third"
+      per_90: true
+
+  # Discipline & Risk
+  discipline:
+    fouls_committed:
+      description: "Fouls committed"
+      event_type: 4
+      per_90: true
+    fouls_won:
+      description: "Fouls won"
+      per_90: true
+    yellow_cards:
+      description: "Yellow cards"
+      event_type: 17
+      per_90: true
+    red_cards:
+      description: "Red cards"
+      event_type: 18
+      per_90: true
+    turnovers:
+      description: "Total turnovers (dispossessions + failed passes in dangerous areas)"
+      per_90: true
+    errors_leading_to_shot:
+      description: "Errors leading to opponent shot"
+      per_90: true
+    errors_leading_to_goal:
+      description: "Errors leading to opponent goal"
+      per_90: true
+    offsides:
+      description: "Offsides"
+      event_type: 72
+      per_90: true
+
+  # Physical (optional - may not be available)
+  physical:
+    distance_covered:
+      description: "Total distance covered (km)"
+      per_90: true
+      optional: true
+    high_speed_runs:
+      description: "High-speed runs (> 5.5 m/s)"
+      per_90: true
+      optional: true
+    sprints:
+      description: "Sprint count (> 7 m/s)"
+      per_90: true
+      optional: true
+    sprint_distance:
+      description: "Total sprint distance (m)"
+      per_90: true
+      optional: true
+    accelerations:
+      description: "Accelerations (> 3 m/s²)"
+      per_90: true
+      optional: true
+    decelerations:
+      description: "Decelerations (< -3 m/s²)"
+      per_90: true
+      optional: true
+    top_speed:
+      description: "Maximum speed reached (m/s)"
+      optional: true
+
+# Radar configurations by position
+radar_profiles:
+  CB:
+    axes:
+      - aerial_duel_win_rate
+      - tackles_won
+      - interceptions
+      - clearances
+      - blocks
+      - ball_recoveries
+      - passes_completed
+      - pass_accuracy
+      - progressive_passes
+      - long_pass_accuracy
+      - carries
+      - pressures
+    weights:
+      aerial_duel_win_rate: 1.2
+      tackles_won: 1.0
+      interceptions: 1.2
+      clearances: 1.0
+      blocks: 0.8
+      ball_recoveries: 1.0
+      passes_completed: 0.8
+      pass_accuracy: 0.9
+      progressive_passes: 1.1
+      long_pass_accuracy: 1.0
+      carries: 0.7
+      pressures: 0.9
+
+  FB:
+    axes:
+      - tackles_won
+      - interceptions
+      - aerial_duel_win_rate
+      - progressive_passes
+      - crosses
+      - cross_accuracy
+      - progressive_carries
+      - dribble_success_rate
+      - key_passes
+      - final_third_entries
+      - pressures
+      - ball_recoveries
+    weights:
+      tackles_won: 1.0
+      interceptions: 0.9
+      aerial_duel_win_rate: 0.7
+      progressive_passes: 1.1
+      crosses: 1.2
+      cross_accuracy: 1.0
+      progressive_carries: 1.1
+      dribble_success_rate: 0.9
+      key_passes: 1.0
+      final_third_entries: 1.0
+      pressures: 0.8
+      ball_recoveries: 0.8
+
+  DM:
+    axes:
+      - tackles_won
+      - interceptions
+      - ball_recoveries
+      - pressures
+      - aerial_duel_win_rate
+      - passes_completed
+      - pass_accuracy
+      - progressive_passes
+      - line_breaking_passes
+      - carries
+      - dispossessions
+      - fouls_committed
+    weights:
+      tackles_won: 1.2
+      interceptions: 1.2
+      ball_recoveries: 1.1
+      pressures: 1.0
+      aerial_duel_win_rate: 0.8
+      passes_completed: 1.0
+      pass_accuracy: 1.1
+      progressive_passes: 1.2
+      line_breaking_passes: 1.0
+      carries: 0.7
+      dispossessions: -0.8
+      fouls_committed: -0.5
+
+  CM:
+    axes:
+      - passes_completed
+      - pass_accuracy
+      - progressive_passes
+      - line_breaking_passes
+      - final_third_entries
+      - key_passes
+      - xA
+      - progressive_carries
+      - dribble_success_rate
+      - tackles_won
+      - interceptions
+      - pressures
+    weights:
+      passes_completed: 1.0
+      pass_accuracy: 1.0
+      progressive_passes: 1.2
+      line_breaking_passes: 1.1
+      final_third_entries: 1.0
+      key_passes: 1.1
+      xA: 1.0
+      progressive_carries: 1.0
+      dribble_success_rate: 0.9
+      tackles_won: 0.8
+      interceptions: 0.8
+      pressures: 0.8
+
+  AM:
+    axes:
+      - key_passes
+      - xA
+      - shot_creating_actions
+      - progressive_passes
+      - final_third_entries
+      - penalty_area_entries
+      - through_balls
+      - progressive_carries
+      - dribble_success_rate
+      - shots
+      - xG
+      - pressures
+    weights:
+      key_passes: 1.2
+      xA: 1.3
+      shot_creating_actions: 1.1
+      progressive_passes: 1.0
+      final_third_entries: 1.0
+      penalty_area_entries: 1.1
+      through_balls: 1.0
+      progressive_carries: 1.0
+      dribble_success_rate: 1.0
+      shots: 0.9
+      xG: 1.0
+      pressures: 0.7
+
+  W:
+    axes:
+      - dribble_success_rate
+      - progressive_carries
+      - carries_into_box
+      - crosses
+      - cross_accuracy
+      - key_passes
+      - xA
+      - shots
+      - xG
+      - shot_creating_actions
+      - pressures
+      - tackles_won
+    weights:
+      dribble_success_rate: 1.2
+      progressive_carries: 1.1
+      carries_into_box: 1.1
+      crosses: 1.0
+      cross_accuracy: 1.0
+      key_passes: 1.1
+      xA: 1.2
+      shots: 1.0
+      xG: 1.1
+      shot_creating_actions: 1.0
+      pressures: 0.8
+      tackles_won: 0.6
+
+  ST:
+    axes:
+      - goals
+      - xG
+      - xG_per_shot
+      - shots
+      - shots_on_target
+      - aerial_duel_win_rate
+      - key_passes
+      - xA
+      - progressive_carries
+      - pressures
+      - touches
+      - ball_recoveries
+    weights:
+      goals: 1.3
+      xG: 1.2
+      xG_per_shot: 1.0
+      shots: 1.0
+      shots_on_target: 1.1
+      aerial_duel_win_rate: 0.9
+      key_passes: 0.8
+      xA: 0.9
+      progressive_carries: 0.8
+      pressures: 0.9
+      touches: 0.6
+      ball_recoveries: 0.5
+
+# Recommendation scoring
+recommendation:
+  thresholds:
+    recommend: 70
+    monitor: 50
+  risk_factors:
+    injury_history_weight: 0.2
+    card_rate_weight: 0.15
+    turnover_rate_weight: 0.15
+    consistency_weight: 0.2
+    minutes_stability_weight: 0.15
+    age_curve_weight: 0.15
+  fit_weights:
+    percentile_score: 0.5
+    role_match: 0.3
+    potential_ceiling: 0.2
+
+# Zone definitions (percentage of pitch length/width)
+zones:
+  defensive_third:
+    x_min: 0
+    x_max: 33.33
+  middle_third:
+    x_min: 33.33
+    x_max: 66.66
+  final_third:
+    x_min: 66.66
+    x_max: 100
+  left_channel:
+    y_min: 0
+    y_max: 21.1
+  left_half_space:
+    y_min: 21.1
+    y_max: 36.8
+  central:
+    y_min: 36.8
+    y_max: 63.2
+  right_half_space:
+    y_min: 63.2
+    y_max: 78.9
+  right_channel:
+    y_min: 78.9
+    y_max: 100
+  box:
+    x_min: 83
+    x_max: 100
+    y_min: 21.1
+    y_max: 78.9
+  zone_14:
+    x_min: 66.66
+    x_max: 83
+    y_min: 36.8
+    y_max: 63.2
+
+# Progressive action thresholds
+thresholds:
+  progressive_pass_meters: 10
+  progressive_carry_meters: 10
+  long_pass_meters: 25
+  switch_lateral_meters: 40
+  high_speed_threshold_ms: 5.5
+  sprint_threshold_ms: 7.0
+  acceleration_threshold: 3.0

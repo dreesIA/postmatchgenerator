@@ -1,0 +1,13 @@
+team,overall_record,conference_record,file,rows
+Boston College,4-7-5,1-4-3,results_team_boston_college.csv,16
+Clemson,13-7-1,3-4-1,results_team_clemson.csv,21
+Duke,13-2-4,5-0-3,results_team_duke.csv,19
+Louisville,9-6-3,4-3-1,results_team_louisville.csv,18
+NC State,6-7-4,1-5-2,results_team_nc_state.csv,17
+North Carolina,8-6-5,2-2-4,results_team_north_carolina.csv,19
+Notre Dame,8-7-2,3-4-1,results_team_notre_dame.csv,17
+Pitt,12-5-5,3-2-3,results_team_pitt.csv,22
+Syracuse,17-2-5,4-1-2,results_team_syracuse.csv,24
+Virginia,10-4-5,5-1-2,results_team_virginia.csv,19
+Virginia Tech,3-14-1,0-8-0,results_team_virginia_tech.csv,18
+Wake Forest,14-5-0,5-2-0,results_team_wake_forest.csv,19

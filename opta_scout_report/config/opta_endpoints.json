@@ -1,0 +1,77 @@
+{
+  "base_url": "https://api.performfeeds.com",
+  "auth": {
+    "type": "basic",
+    "username_env": "OPTA_USERNAME",
+    "password_env": "OPTA_PASSWORD"
+  },
+  "endpoints": {
+    "matches": {
+      "path": "/soccerdata/match/{competition_id}",
+      "params": {
+        "seasonId": "{season_id}",
+        "_fmt": "json",
+        "_rt": "b",
+        "live": "no"
+      }
+    },
+    "match_events": {
+      "path": "/soccerdata/matchevent/{match_id}",
+      "params": {
+        "_fmt": "json",
+        "_rt": "b"
+      }
+    },
+    "match_stats": {
+      "path": "/soccerdata/matchstats/{match_id}",
+      "params": {
+        "_fmt": "json",
+        "_rt": "b"
+      }
+    },
+    "player_stats": {
+      "path": "/soccerdata/playerstats/{competition_id}",
+      "params": {
+        "seasonId": "{season_id}",
+        "teamId": "{team_id}",
+        "_fmt": "json",
+        "_rt": "b"
+      }
+    },
+    "team_stats": {
+      "path": "/soccerdata/teamstats/{competition_id}",
+      "params": {
+        "seasonId": "{season_id}",
+        "_fmt": "json",
+        "_rt": "b"
+      }
+    },
+    "squads": {
+      "path": "/soccerdata/squads/{competition_id}",
+      "params": {
+        "seasonId": "{season_id}",
+        "teamId": "{team_id}",
+        "_fmt": "json",
+        "_rt": "b"
+      }
+    },
+    "standings": {
+      "path": "/soccerdata/standings/{competition_id}",
+      "params": {
+        "seasonId": "{season_id}",
+        "_fmt": "json",
+        "_rt": "b"
+      }
+    }
+  },
+  "rate_limits": {
+    "requests_per_minute": 60,
+    "retry_attempts": 3,
+    "backoff_factor": 2
+  },
+  "cache": {
+    "enabled": true,
+    "directory": ".opta_cache",
+    "expiry_hours": 24
+  }
+}

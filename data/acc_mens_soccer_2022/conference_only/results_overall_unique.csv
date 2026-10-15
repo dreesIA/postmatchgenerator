@@ -1,0 +1,48 @@
+Date,Location,RawResult,HomeTeam,HomeGoals,AwayGoals,AwayTeam,ParseOK
+09/09/2022,Chapel Hill,* North Carolina 0 - 1 Pitt,North Carolina,0,1,Pitt,True
+09/09/2022,Charlottesville,* Virginia 4 - 2 Virginia Tech,Virginia,4,2,Virginia Tech,True
+09/10/2022,"Newton, Mass.",* Boston College 1 - 2 Clemson,Boston College,1,2,Clemson,True
+09/10/2022,Louisville,* Louisville 1 - 2 Duke,Louisville,1,2,Duke,True
+09/10/2022,Syracuse,* Syracuse 1 - 0 Notre Dame,Syracuse,1,0,Notre Dame,True
+09/10/2022,Winston-Salem,* Wake Forest 2 - 0 NC State,Wake Forest,2,0,NC State,True
+09/16/2022,"Newton, MA",* Louisville 1 - 1 Boston College,Louisville,1,1,Boston College,True
+09/16/2022,Durham,* North Carolina 1 - 1 Duke,North Carolina,1,1,Duke,True
+09/16/2022,Pittsburgh,* Pitt 3 - 0 NC State,Pitt,3,0,NC State,True
+09/16/2022,Clemson,* Syracuse 2 - 1 Clemson,Syracuse,2,1,Clemson,True
+09/16/2022,Charlottesville,* Virginia 1 - 2 Notre Dame,Virginia,1,2,Notre Dame,True
+09/16/2022,Blacksburg,* Virginia Tech 0 - 1 Wake Forest,Virginia Tech,0,1,Wake Forest,True
+09/23/2022,Louisville,* Pitt 1 - 2 Louisville,Pitt,1,2,Louisville,True
+09/23/2022,Raleigh,* Virginia Tech 0 - 1 NC State,Virginia Tech,0,1,NC State,True
+09/24/2022,Durham,* Duke 1 - 0 Boston College,Duke,1,0,Boston College,True
+09/24/2022,"South Bend, IN",* North Carolina 1 - 0 Notre Dame,North Carolina,1,0,Notre Dame,True
+09/24/2022,Syracuse,* Virginia 1 - 0 Syracuse,Virginia,1,0,Syracuse,True
+09/24/2022,Clemson,* Wake Forest 6 - 1 Clemson,Wake Forest,6,1,Clemson,True
+09/30/2022,Raleigh,* NC State 0 - 1 Louisville,NC State,0,1,Louisville,True
+09/30/2022,"South Bend, IN",* Notre Dame 2 - 1 Boston College,Notre Dame,2,1,Boston College,True
+09/30/2022,Pittsburgh,* Pitt 1 - 3 Virginia,Pitt,1,3,Virginia,True
+09/30/2022,Blacksburg,* Virginia Tech 0 - 3 Syracuse,Virginia Tech,0,3,Syracuse,True
+10/01/2022,Winston-Salem,* Wake Forest 2 - 3 Duke,Wake Forest,2,3,Duke,True
+10/03/2022,Chapel Hill,* North Carolina 0 - 1 Clemson,North Carolina,0,1,Clemson,True
+10/07/2022,"Newton, MA",* NC State 0 - 2 Boston College,NC State,0,2,Boston College,True
+10/07/2022,Chapel Hill,* North Carolina 2 - 0 Virginia Tech,North Carolina,2,0,Virginia Tech,True
+10/07/2022,Pittsburgh,* Pitt 1 - 1 Clemson,Pitt,1,1,Clemson,True
+10/07/2022,Charlottesville,* Virginia 0 - 0 Duke,Virginia,0,0,Duke,True
+10/08/2022,"South Bend, IN",* Notre Dame 0 - 2 Louisville,Notre Dame,0,2,Louisville,True
+10/14/2022,Raleigh,* North Carolina 2 - 2 NC State,North Carolina,2,2,NC State,True
+10/14/2022,Durham,* Notre Dame 0 - 2 Duke,Notre Dame,0,2,Duke,True
+10/14/2022,Blacksburg,* Pitt 1 - 0 Virginia Tech,Pitt,1,0,Virginia Tech,True
+10/14/2022,Louisville,* Syracuse 2 - 1 Louisville,Syracuse,2,1,Louisville,True
+10/15/2022,Clemson,* Virginia 2 - 1 Clemson,Virginia,2,1,Clemson,True
+10/15/2022,Winston-Salem,* Wake Forest 3 - 1 Boston College,Wake Forest,3,1,Boston College,True
+10/21/2022,Louisville,* Louisville 1 - 0 Clemson,Louisville,1,0,Clemson,True
+10/21/2022,"Newton, Mass.",* North Carolina 1 - 1 Boston College,North Carolina,1,1,Boston College,True
+10/21/2022,Durham,* Pitt 0 - 0 Duke,Pitt,0,0,Duke,True
+10/21/2022,"South Bend, IN",* Virginia Tech 0 - 1 Notre Dame,Virginia Tech,0,1,Notre Dame,True
+10/22/2022,Raleigh,* Syracuse 1 - 1 NC State,Syracuse,1,1,NC State,True
+10/22/2022,Charlottesville,* Virginia 1 - 0 Wake Forest,Virginia,1,0,Wake Forest,True
+10/28/2022,Clemson,* NC State 0 - 3 Clemson,NC State,0,3,Clemson,True
+10/28/2022,Chapel Hill,* North Carolina 2 - 2 Virginia,North Carolina,2,2,Virginia,True
+10/28/2022,Pittsburgh,* Pitt 1 - 1 Notre Dame,Pitt,1,1,Notre Dame,True
+10/28/2022,Syracuse,* Syracuse 1 - 1 Boston College,Syracuse,1,1,Boston College,True
+10/28/2022,Blacksburg,* Virginia Tech 0 - 1 Duke,Virginia Tech,0,1,Duke,True
+10/28/2022,Winston-Salem,* Wake Forest 3 - 0 Louisville,Wake Forest,3,0,Louisville,True

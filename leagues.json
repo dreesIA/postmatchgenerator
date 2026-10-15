@@ -1,0 +1,19 @@
+{
+  "leagues": {
+    "usl_championship": {
+      "name": "USL Championship",
+      "country": "USA",
+      "tournament_id": "8hdq5pmnb4m3p9t24ytwgjitw",
+      "outlet_key": "qxcx5jmswgto1qeqcjzghtddt",
+      "season": "2025"
+    },
+    "swiss_super_league": {
+      "name": "Swiss Super League",
+      "country": "Switzerland",
+      "tournament_id": "31tcbue0pnhmssglpr9ezvkt0",
+      "outlet_key": "qxcx5jmswgto1qeqcjzghtddt",
+      "season": "2024-25"
+    }
+  },
+  "default_league": "usl_championship"
+}
