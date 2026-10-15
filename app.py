@@ -5,13 +5,14 @@ Streamlit App for Football Match & Player Analysis
 import streamlit as st
 import matplotlib.pyplot as plt
 import pandas as pd
+import json
 import sys
 from pathlib import Path
 
 # Add scout report to path
 sys.path.insert(0, str(Path(__file__).parent / 'opta_scout_report' / 'src'))
 
-from opta_api import OptaAPI, EventProcessor, ConfigLoader, PassingNetworkBuilder
+from opta_api import OptaAPI, EventProcessor, ConfigLoader, PassingNetworkBuilder, RateLimitError
 from player_viz import PlayerDataAggregator, PlayerShotMap, PlayerPassMap, PlayerHeatMap, PlayerProfile
 from pitch_viz import ShotMap, PassingNetwork
 from match_overview import MatchOverview
@@ -85,6 +86,22 @@ def fetch_match_stats(_api, match_id):
 
 
 @st.cache_data(ttl=3600)
+def load_uploaded_match(_api, file_bytes):
+    """Parse a match file from download_match.py into (match_id, (events_df, match_info, match_stats))"""
+    not_match_file = ValueError("This isn't a match file from download_match.py")
+    try:
+        data = json.loads(file_bytes)
+    except ValueError:
+        raise not_match_file
+    if not isinstance(data, dict) or not isinstance(data.get('matchevent'), dict) \
+            or not isinstance(data.get('matchstats'), dict):
+        raise not_match_file
+    match_id = data.get('match_id') or data['matchevent'].get('matchInfo', {}).get('id', '')
+    events_df, match_info = _api.parse_match_events(data['matchevent'], match_id)
+    return match_id, (events_df, match_info, data['matchstats'])
+
+
+@st.cache_data(ttl=3600)
 def fetch_tournament_matches(_api, tournament_id):
     """Cache tournament matches for 1 hour"""
     return _api.get_matches_by_tournament(tournament_id)
@@ -128,6 +145,14 @@ def main():
                     for key, value in parsed_ids.items():
                         st.code(f"{key}: {value}")
 
+        # Match file upload - for when this server can't reach the Opta feed
+        uploaded_match = st.file_uploader(
+            "Or upload a match file",
+            type="json",
+            help="Create one on a computer that can reach the feed with: "
+                 "python download_match.py <match URL>"
+        )
+
         st.divider()
 
         # League selection
@@ -161,8 +186,15 @@ def main():
         player_id = parsed_ids.get('player_id') or manual_player_id
         tournament_id = parsed_ids.get('tournament_id') or league_config.tournament_id
 
-    # Main content - determine what to show based on available IDs
-    if player_id and team_id:
+    # Main content - an uploaded match file takes priority, then available IDs
+    if uploaded_match is not None:
+        try:
+            uploaded_match_id, preloaded = load_uploaded_match(api, uploaded_match.getvalue())
+        except ValueError as e:
+            st.error(f"Couldn't read the match file: {e}")
+            return
+        show_match_page(api, uploaded_match_id, preloaded=preloaded)
+    elif player_id and team_id:
         # Player season analysis
         show_player_season_analysis(api, player_id, team_id, tournament_id)
     elif match_id:
@@ -229,11 +261,19 @@ def show_team_overview(api, team_id, tournament_id):
         st.error(f"Error loading team data: {e}")
 
 
-def show_match_page(api, match_id):
-    """Show match analysis page"""
+def show_match_page(api, match_id, preloaded=None):
+    """Show match analysis page
+
+    preloaded: (events_df, match_info, match_stats) from an uploaded match file;
+    when given, nothing is fetched from the Opta feed
+    """
+    match_stats = None
     try:
-        with st.spinner("Fetching match data..."):
-            events_df, match_info = fetch_match_events(api, match_id)
+        if preloaded is not None:
+            events_df, match_info, match_stats = preloaded
+        else:
+            with st.spinner("Fetching match data..."):
+                events_df, match_info = fetch_match_events(api, match_id)
 
         if len(events_df) == 0:
             status = getattr(match_info, 'status', '')
@@ -249,6 +289,10 @@ def show_match_page(api, match_id):
                          "This competition may not include event-level data.")
             return
 
+    except RateLimitError as e:
+        st.error(f"Error fetching match data: {e} If it persists, download the match with "
+                 "download_match.py on another computer and upload the file in the sidebar.")
+        return
     except Exception as e:
         st.error(f"Error fetching match data: {str(e)}")
         return
@@ -275,10 +319,10 @@ def show_match_page(api, match_id):
         show_player_analysis(api, events_df, match_info, match_id)
 
     with tab3:
-        show_match_overview(api, events_df, match_info, match_id)
+        show_match_overview(api, events_df, match_info, match_id, match_stats)
 
     with tab4:
-        show_phase_report(api, events_df, match_info, match_id)
+        show_phase_report(api, events_df, match_info, match_id, match_stats)
 
 
 def show_player_season_analysis(api, player_id, team_id, tournament_id):
@@ -326,7 +370,7 @@ def show_player_season_analysis(api, player_id, team_id, tournament_id):
 
         for i, match_id in enumerate(match_ids):
             try:
-                aggregator.load_match(match_id, player_id)
+                aggregator.load_match(match_id, player_id, events=fetch_match_events(api, match_id))
             except Exception as e:
                 st.warning(f"Could not load match {match_id}: {e}")
             progress_bar.progress((i + 1) / num_matches)
@@ -546,7 +590,7 @@ def show_match_analysis(events_df, match_info):
         st.dataframe(shot_display, use_container_width=True, hide_index=True)
 
 
-def show_match_overview(api, events_df, match_info, match_id):
+def show_match_overview(api, events_df, match_info, match_id, match_stats=None):
     """Display the full match overview one-pager"""
     import tempfile
     import os
@@ -558,8 +602,9 @@ def show_match_overview(api, events_df, match_info, match_id):
     if st.button("Generate Full Report", type="primary"):
         with st.spinner("Generating match overview... This may take a moment."):
             try:
-                # Fetch match stats for accurate possession data
-                match_stats = fetch_match_stats(api, match_id)
+                # Fetch match stats for accurate possession data (already loaded for uploaded files)
+                if match_stats is None:
+                    match_stats = fetch_match_stats(api, match_id)
 
                 # Create the match overview with real stats
                 overview = MatchOverview(events_df, match_info, match_stats)
@@ -639,7 +684,7 @@ def show_match_overview(api, events_df, match_info, match_id):
                 """)
 
 
-def show_phase_report(api, events_df, match_info, match_id):
+def show_phase_report(api, events_df, match_info, match_id, match_stats=None):
     """Display the phase-by-phase match report (7 pages)"""
     import re
     from io import BytesIO
@@ -718,8 +763,9 @@ def show_phase_report(api, events_df, match_info, match_id):
     if st.button("Generate Phase Report", type="primary"):
         with st.spinner("Generating phase analysis... This may take a moment."):
             try:
-                # Fetch match stats
-                match_stats = fetch_match_stats(api, match_id)
+                # Fetch match stats (already loaded for uploaded files)
+                if match_stats is None:
+                    match_stats = fetch_match_stats(api, match_id)
 
                 # Create the phase report
                 report = FullPhaseReport(events_df, match_info, match_stats)
@@ -863,7 +909,7 @@ def show_player_analysis(api, events_df, match_info, match_id):
     # Load player data
     with st.spinner("Loading player data..."):
         aggregator = PlayerDataAggregator(api)
-        aggregator.load_match(match_id, selected_player_id)
+        aggregator.load_match(match_id, selected_player_id, events=(events_df, match_info))
 
     if aggregator.player_info is None:
         st.warning("No data found for this player in this match")

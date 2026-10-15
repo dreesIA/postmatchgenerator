@@ -50,18 +50,20 @@ class PlayerDataAggregator:
         self._match_count = 0
         self._player_info: Optional[PlayerInfo] = None
 
-    def load_match(self, match_id: str, player_id: str) -> 'PlayerDataAggregator':
+    def load_match(self, match_id: str, player_id: str,
+                   events: Optional[Tuple[pd.DataFrame, MatchInfo]] = None) -> 'PlayerDataAggregator':
         """
         Load and aggregate data from a single match
 
         Args:
             match_id: Opta match ID
             player_id: Target player ID
+            events: Already-loaded (events DataFrame, MatchInfo); fetched from the API if omitted
 
         Returns:
             self (for method chaining)
         """
-        events_df, match_info = self.api.get_match_events(match_id)
+        events_df, match_info = events if events is not None else self.api.get_match_events(match_id)
         processor = EventProcessor(events_df, match_info)
 
         # Filter events for target player

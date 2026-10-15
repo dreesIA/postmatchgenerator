@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import numpy as np
 import json
+import os
 import time
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
@@ -264,6 +265,16 @@ class OptaAPI:
         else:
             self.outlet_key = self.DEFAULT_OUTLET_KEY
 
+        # Optional relay in front of the feed (see cloudflare_worker/), for hosts the feed
+        # rate limits. Set as env vars or as root-level Streamlit secrets.
+        relay_url = os.environ.get('OPTA_BASE_URL', '').strip().rstrip('/')
+        if relay_url and not relay_url.endswith('/soccerdata'):
+            relay_url += '/soccerdata'
+        self.base_url = relay_url or self.BASE_URL
+        relay_key = os.environ.get('OPTA_RELAY_KEY', '').strip()
+        if relay_key:
+            self.session.headers['X-Relay-Key'] = relay_key
+
     @classmethod
     def for_league(cls, league_key: str, config_path: str = None) -> 'OptaAPI':
         """
@@ -326,20 +337,32 @@ class OptaAPI:
             '_clbk': 'callback'
         })
         
-        url = f"{self.BASE_URL}/{endpoint}/{self.outlet_key}"
+        url = f"{self.base_url}/{endpoint}/{self.outlet_key}"
         return self._fetch(url, params)
     
     def get_match_events(self, match_id: str) -> Tuple[pd.DataFrame, MatchInfo]:
         """
         Retrieve all events for a match
-        
+
         Args:
             match_id: Opta match ID
-            
+
         Returns:
             Tuple of (events DataFrame, MatchInfo object)
         """
-        url = f"{self.BASE_URL}/matchevent/{self.outlet_key}/{match_id}"
+        return self.parse_match_events(self.get_match_events_raw(match_id), match_id)
+
+    def get_match_events_raw(self, match_id: str) -> dict:
+        """
+        Retrieve the raw match event feed (as saved by download_match.py)
+
+        Args:
+            match_id: Opta match ID
+
+        Returns:
+            Feed response as a dictionary
+        """
+        url = f"{self.base_url}/matchevent/{self.outlet_key}/{match_id}"
         params = {
             '_rt': 'c',
             '_lcl': 'en',
@@ -358,6 +381,19 @@ class OptaAPI:
                 f"wrong, or this competition isn't available with the current outlet key."
             )
 
+        return data
+
+    def parse_match_events(self, data: dict, match_id: str) -> Tuple[pd.DataFrame, MatchInfo]:
+        """
+        Turn a raw match event feed into an events DataFrame and MatchInfo
+
+        Args:
+            data: Raw feed from get_match_events_raw (or an uploaded match file)
+            match_id: Opta match ID
+
+        Returns:
+            Tuple of (events DataFrame, MatchInfo object)
+        """
         # Extract match info
         match_info_raw = data.get('matchInfo', {})
         contestants = match_info_raw.get('contestant', [])
@@ -402,7 +438,7 @@ class OptaAPI:
         Returns:
             Dictionary with team and player stats
         """
-        url = f"{self.BASE_URL}/matchstats/{self.outlet_key}/{match_id}"
+        url = f"{self.base_url}/matchstats/{self.outlet_key}/{match_id}"
         params = {
             '_rt': 'c',
             'detailed': 'yes',
@@ -430,7 +466,7 @@ class OptaAPI:
         if tournament_id is None:
             raise ValueError("tournament_id must be provided or set via league config")
 
-        url = f"{self.BASE_URL}/match/{self.outlet_key}"
+        url = f"{self.base_url}/match/{self.outlet_key}"
         params = {
             '_rt': 'c',
             'tmcl': tournament_id,
@@ -457,7 +493,7 @@ class OptaAPI:
         Returns:
             DataFrame with player info
         """
-        url = f"{self.BASE_URL}/squads/{self.outlet_key}"
+        url = f"{self.base_url}/squads/{self.outlet_key}"
         params = {
             '_rt': 'c',
             'ctst': team_id,
@@ -485,7 +521,7 @@ class OptaAPI:
         Returns:
             DataFrame with standings
         """
-        url = f"{self.BASE_URL}/standings/{self.outlet_key}"
+        url = f"{self.base_url}/standings/{self.outlet_key}"
         params = {
             '_rt': 'c',
             'tmcl': tournament_id,
