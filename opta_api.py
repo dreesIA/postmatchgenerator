@@ -7,12 +7,19 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 import numpy as np
+import gzip
 import json
 import os
+import re
 import time
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
+
+# Feed responses bundled with the app (built by build_snapshots.py)
+SNAPSHOT_DIR = Path(__file__).parent / 'snapshots'
+# Request params that are the same on every request, so don't identify a response
+_STANDARD_PARAMS = {'_rt', '_lcl', '_fmt', '_clbk'}
 
 
 class RateLimitError(Exception):
@@ -246,14 +253,23 @@ class OptaAPI:
         215: 'individual_play',
     }
 
-    def __init__(self, league: LeagueConfig = None, outlet_key: str = None):
+    def __init__(self, league: LeagueConfig = None, outlet_key: str = None,
+                 record_snapshots: bool = False):
         """
         Initialize API client
 
         Args:
             league: LeagueConfig object for the target league
             outlet_key: Override outlet key (optional, uses league config or default)
+            record_snapshots: Save feed responses to the snapshot folder (build_snapshots.py)
         """
+        # Bundled responses are served before the live feed, so bundled matches
+        # load even when the feed rate limits the host
+        self.snapshot_dir = SNAPSHOT_DIR
+        self.read_snapshots = True
+        self.record_snapshots = record_snapshots
+        self.live_requests = 0
+
         self.session = requests.Session()
         self.session.headers.update(self.HEADERS)
 
@@ -301,9 +317,33 @@ class OptaAPI:
         json_str = text[start:end]
         return json.loads(json_str)
 
+    def _snapshot_path(self, url: str, params: dict) -> Path:
+        """File a feed response is bundled under, e.g. snapshots/matchevent/<match_id>.json.gz"""
+        endpoint, _outlet_key, *ids = url.split('/soccerdata/', 1)[1].split('/')
+        extra = [f"{k}-{v}" for k, v in sorted(params.items()) if k not in _STANDARD_PARAMS]
+        name = re.sub(r'[^A-Za-z0-9_.-]+', '_', '_'.join(ids + extra)) or 'index'
+        return self.snapshot_dir / endpoint / f"{name}.json.gz"
+
     def _fetch(self, url: str, params: dict, max_retries: int = 3) -> dict:
+        """Get a feed response, from the bundled snapshots when available, else the live feed"""
+        snapshot = self._snapshot_path(url, params)
+        if self.read_snapshots and snapshot.exists():
+            return json.loads(gzip.decompress(snapshot.read_bytes()))
+
+        data = self._fetch_live(url, params, max_retries)
+
+        if self.record_snapshots and 'errorCode' not in data:
+            snapshot.parent.mkdir(parents=True, exist_ok=True)
+            tmp = snapshot.with_suffix('.tmp')
+            # mtime=0 keeps the bytes identical when the data hasn't changed (clean git diffs)
+            tmp.write_bytes(gzip.compress(json.dumps(data, separators=(',', ':')).encode(), 9, mtime=0))
+            tmp.replace(snapshot)
+        return data
+
+    def _fetch_live(self, url: str, params: dict, max_retries: int = 3) -> dict:
         """GET a feed URL and parse it, retrying with backoff when rate limited (429)"""
         for attempt in range(max_retries + 1):
+            self.live_requests += 1
             response = self.session.get(url, params=params, timeout=30)
             # The feed reports errors either as a real HTTP status or inside a 200 body
             rate_limited = response.status_code == 429
@@ -604,6 +644,7 @@ class OptaAPI:
                             'away_team': contestants[1].get('name') if len(contestants) > 1 else '',
                             'home_id': contestants[0].get('id') if contestants else '',
                             'away_id': contestants[1].get('id') if len(contestants) > 1 else '',
+                            'status': match.get('liveData.matchDetails.matchStatus', ''),
                         })
                         break
 

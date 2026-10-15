@@ -289,9 +289,10 @@ def show_match_page(api, match_id, preloaded=None):
                          "This competition may not include event-level data.")
             return
 
-    except RateLimitError as e:
-        st.error(f"Error fetching match data: {e} If it persists, download the match with "
-                 "download_match.py on another computer and upload the file in the sidebar.")
+    except RateLimitError:
+        st.error("Live data for this match is unavailable: the Opta feed is rate limiting this "
+                 "server. Matches bundled with the app still load, and you can upload a match "
+                 "file from download_match.py in the sidebar.")
         return
     except Exception as e:
         st.error(f"Error fetching match data: {str(e)}")
@@ -329,7 +330,17 @@ def show_player_season_analysis(api, player_id, team_id, tournament_id):
     """Show player analysis across the entire season"""
 
     # Get player info
-    player_info = api.get_player_info(player_id, team_id, tournament_id)
+    try:
+        player_info = api.get_player_info(player_id, team_id, tournament_id)
+        with st.spinner("Loading season matches..."):
+            team_matches = fetch_team_matches(api, team_id, tournament_id)
+    except RateLimitError:
+        st.error("Live data for this team is unavailable: the Opta feed is rate limiting this "
+                 "server. Teams and matches bundled with the app still load.")
+        return
+    except Exception as e:
+        st.error(f"Error loading player data: {e}")
+        return
 
     if player_info:
         player_name = f"{player_info.get('firstName', '')} {player_info.get('lastName', '')}".strip()
@@ -340,9 +351,9 @@ def show_player_season_analysis(api, player_id, team_id, tournament_id):
 
     st.divider()
 
-    # Get team matches
-    with st.spinner("Loading season matches..."):
-        team_matches = fetch_team_matches(api, team_id, tournament_id)
+    # Only finished matches have complete event data
+    if 'status' in team_matches.columns:
+        team_matches = team_matches[team_matches['status'].isin(['Played', 'Awarded'])]
 
     if len(team_matches) == 0:
         st.warning("No matches found for this team")
