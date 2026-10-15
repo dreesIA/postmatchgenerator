@@ -17,10 +17,10 @@ The Opta feed rate limits some hosting servers (error `HTTP 429`), so the app sh
 feed responses in [snapshots/](snapshots/). The app serves those before calling the feed, so
 bundled matches, teams and players load on any host, with no network access needed.
 
-Bundled now:
+Bundled now (the app's sidebar lists this too):
 
 - USL Championship 2026: every match played through October 14, 2026, plus all squads
-- USL Championship 2025: Charleston Battery's season (the examples on the landing page)
+- USL Championship 2025: the full season, plus all squads
 
 Anything not bundled is fetched live from the feed.
 
