@@ -9,7 +9,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Choose a season, team, and match in the sidebar, or paste a Scoresway match, team, or player URL.
+Choose a season, team, and match in the sidebar.
 
 ## Bundled data
 
@@ -17,7 +17,7 @@ The Opta feed rate limits some hosting servers (error `HTTP 429`), so the app sh
 feed responses in [snapshots/](snapshots/). The app serves those before calling the feed, so
 bundled matches, teams and players load on any host, with no network access needed.
 
-Bundled now (the app's sidebar lists this too):
+Bundled now (these are the seasons in the app's match picker):
 
 - USL Championship 2026: every match played through October 14, 2026, plus all squads
 - USL Championship 2025: the full season, plus all squads
@@ -40,15 +40,7 @@ Matches already bundled are skipped. Match lists and squads are always refreshed
 The season ID is the part of a Scoresway URL after the league name, e.g.
 `/soccer/usl-championship-2026/cbkjk31sv9wm38ljg3vxhtus4/`.
 
-## Other ways to load data on a rate-limited host
-
-### Upload a match file
-
-On a computer that can reach the feed, run
-`python download_match.py "<Scoresway match URL>"`, then use **Or upload a match file**
-in the app's sidebar. The file is saved in `match_files/`.
-
-### Cloudflare Worker relay
+## Live data on a rate-limited host: Cloudflare Worker relay
 
 The app's live requests can go through a free Cloudflare Worker
 ([cloudflare_worker/worker.js](cloudflare_worker/worker.js)), so they come from Cloudflare

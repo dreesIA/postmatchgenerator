@@ -77,7 +77,6 @@ for _, _module in _project_modules():
 # Page config
 st.set_page_config(
     page_title="Football Analytics",
-    page_icon="⚽",
     layout="wide"
 )
 
@@ -191,10 +190,6 @@ def _reset_widgets(*keys):
         st.session_state[key] = None
 
 
-def _clear_url():
-    st.session_state['url_input'] = ''
-
-
 def pick_bundled_match():
     """Season, team, and match dropdowns over the bundled seasons; returns the chosen match ID"""
     seasons = bundled_seasons()
@@ -223,25 +218,8 @@ def pick_bundled_match():
     labels = {m['matchInfo.id']: match_label(m, team_id) for _, m in played.iterrows()}
     return st.selectbox(
         "Match", list(labels), format_func=labels.get,
-        index=None, placeholder=f"Choose one of {len(labels)} matches", key='pick_match',
-        on_change=_clear_url
+        index=None, placeholder=f"Choose one of {len(labels)} matches", key='pick_match'
     )
-
-
-@st.cache_data(ttl=3600)
-def load_uploaded_match(_api, file_bytes):
-    """Parse a match file from download_match.py into (match_id, (events_df, match_info, match_stats))"""
-    not_match_file = ValueError("This isn't a match file from download_match.py")
-    try:
-        data = json.loads(file_bytes)
-    except ValueError:
-        raise not_match_file
-    if not isinstance(data, dict) or not isinstance(data.get('matchevent'), dict) \
-            or not isinstance(data.get('matchstats'), dict):
-        raise not_match_file
-    match_id = data.get('match_id') or data['matchevent'].get('matchInfo', {}).get('id', '')
-    events_df, match_info = _api.parse_match_events(data['matchevent'], match_id)
-    return match_id, (events_df, match_info, data['matchstats'])
 
 
 @st.cache_data(ttl=3600)
@@ -263,7 +241,7 @@ def fetch_squad(_api, team_id, tournament_id):
 
 
 def main():
-    st.title("⚽ Football Analytics Dashboard")
+    st.title("Football Analytics Dashboard")
 
     # Sidebar for configuration
     with st.sidebar:
@@ -272,38 +250,6 @@ def main():
         # Match picker - every finished match in the bundled seasons
         st.subheader("Find a match")
         picked_match_id = pick_bundled_match()
-        st.caption(f"Bundled data (loads without the live feed): {bundled_seasons_text()}")
-
-        st.divider()
-
-        # URL input - for players, teams, and matches outside the bundled seasons
-        st.subheader("Or paste a Scoresway URL")
-        url_input = st.text_input(
-            "Scoresway URL",
-            placeholder="https://www.scoresway.com/...",
-            help="Paste a match, team, or player URL from Scoresway",
-            key='url_input',
-            on_change=_reset_widgets, args=('pick_match',)
-        )
-
-        # Parse URL if provided
-        parsed_ids = {}
-        if url_input:
-            api_temp = OptaAPI()
-            parsed_ids = api_temp.parse_scoresway_url(url_input)
-            if parsed_ids:
-                st.success("URL parsed successfully!")
-                with st.expander("Extracted IDs"):
-                    for key, value in parsed_ids.items():
-                        st.code(f"{key}: {value}")
-
-        # Match file upload - for when this server can't reach the Opta feed
-        uploaded_match = st.file_uploader(
-            "Or upload a match file",
-            type="json",
-            help="Create one on a computer that can reach the feed with: "
-                 "python download_match.py <match URL>"
-        )
 
         st.divider()
 
@@ -331,20 +277,13 @@ def main():
         api = OptaAPI.for_league(selected_league_key)
 
         # Determine what IDs we have
-        match_id = parsed_ids.get('match_id') or picked_match_id or manual_match_id
-        team_id = parsed_ids.get('team_id') or manual_team_id
-        player_id = parsed_ids.get('player_id') or manual_player_id
-        tournament_id = parsed_ids.get('tournament_id') or league_config.tournament_id
+        match_id = picked_match_id or manual_match_id
+        team_id = manual_team_id
+        player_id = manual_player_id
+        tournament_id = league_config.tournament_id
 
-    # Main content - an uploaded match file takes priority, then available IDs
-    if uploaded_match is not None:
-        try:
-            uploaded_match_id, preloaded = load_uploaded_match(api, uploaded_match.getvalue())
-        except ValueError as e:
-            st.error(f"Couldn't read the match file: {e}")
-            return
-        show_match_page(api, uploaded_match_id, preloaded=preloaded)
-    elif player_id and team_id:
+    # Main content - determine what to show based on available IDs
+    if player_id and team_id:
         # Player season analysis
         show_player_season_analysis(api, player_id, team_id, tournament_id)
     elif match_id:
@@ -359,37 +298,28 @@ def main():
 
 
 def show_landing_page():
-    """Show instructions when no IDs are provided"""
-    st.info("👈 Choose a season, team, and match in the sidebar to get started, "
-            "or paste a Scoresway URL for player and team pages")
+    """Show instructions when no match is selected"""
+    st.info("Choose a season, team, and match in the sidebar to get started")
 
     col1, col2 = st.columns(2)
 
     with col1:
         st.markdown("### Match Analysis")
         st.markdown("""
-        Paste a match URL to see:
+        Pick a match to see:
         - Match statistics and xG
-        - Shot maps for both teams
-        - Passing networks
-        - Player-level analysis
+        - Shot maps, passing networks, and defensive actions
+        - A full match report and phase-by-phase analysis
         """)
-
-        with st.expander("Example Match URL"):
-            st.code("https://www.scoresway.com/en_GB/soccer/usl-championship-2025/8hdq5pmnb4m3p9t24ytwgjitw/match/view/19a81k01783lyow7nexg2c844/match-summary")
 
     with col2:
         st.markdown("### Player Analysis")
         st.markdown("""
-        Paste a player URL to see:
-        - Season statistics across all matches
+        In a match's Player Analysis tab, pick a player to see:
         - Shot map with xG
         - Pass map with key passes
-        - Touch heat map
+        - Touch heat map and full profile
         """)
-
-        with st.expander("Example Player URL"):
-            st.code("https://www.scoresway.com/en_GB/soccer/usl-championship-2025/8hdq5pmnb4m3p9t24ytwgjitw/teams/view/e3k8yw2rbmphyfu5htn4yi5jk/player/view/caoq1dpq6lz1btrd75s9xuz56")
 
 
 def show_team_overview(api, team_id, tournament_id):
@@ -412,19 +342,11 @@ def show_team_overview(api, team_id, tournament_id):
         st.error(f"Error loading team data: {e}")
 
 
-def show_match_page(api, match_id, preloaded=None):
-    """Show match analysis page
-
-    preloaded: (events_df, match_info, match_stats) from an uploaded match file;
-    when given, nothing is fetched from the Opta feed
-    """
-    match_stats = None
+def show_match_page(api, match_id):
+    """Show match analysis page"""
     try:
-        if preloaded is not None:
-            events_df, match_info, match_stats = preloaded
-        else:
-            with st.spinner("Fetching match data..."):
-                events_df, match_info = fetch_match_events(api, match_id)
+        with st.spinner("Fetching match data..."):
+            events_df, match_info = fetch_match_events(api, match_id)
 
         if len(events_df) == 0:
             status = getattr(match_info, 'status', '')
@@ -446,8 +368,8 @@ def show_match_page(api, match_id, preloaded=None):
                      "data. Reboot the app so it loads the current code.")
         else:
             st.error("This match isn't in the app's bundled data, and the Opta feed is rate "
-                     "limiting this server, so it can't be loaded live right now. You can upload "
-                     f"a match file from download_match.py in the sidebar. Bundled: {bundled_seasons_text()}.")
+                     "limiting this server, so it can't be loaded live right now. "
+                     f"Bundled: {bundled_seasons_text()}.")
         return
     except Exception as e:
         st.error(f"Error fetching match data: {str(e)}")
@@ -478,10 +400,10 @@ def show_match_page(api, match_id, preloaded=None):
         show_player_analysis(api, events_df, match_info, match_id)
 
     with tab3:
-        show_match_overview(api, events_df, match_info, match_id, match_stats)
+        show_match_overview(api, events_df, match_info, match_id)
 
     with tab4:
-        show_phase_report(api, events_df, match_info, match_id, match_stats)
+        show_phase_report(api, events_df, match_info, match_id)
 
 
 def show_player_season_analysis(api, player_id, team_id, tournament_id):
@@ -502,7 +424,7 @@ def show_player_season_analysis(api, player_id, team_id, tournament_id):
 
     if player_info:
         player_name = f"{player_info.get('firstName', '')} {player_info.get('lastName', '')}".strip()
-        st.title(f"📊 {player_name}")
+        st.title(player_name)
         st.caption(f"#{player_info.get('shirtNumber', '')} | {player_info.get('position', '')} | {player_info.get('nationality', '')}")
     else:
         st.title("Player Analysis")
@@ -739,14 +661,31 @@ def show_match_analysis(events_df, match_info):
                 st.info("Not enough data for passing network")
 
     with viz_tab3:
-        if len(defensive) > 0:
-            from pitch_viz import DefensiveActionsMap
-            def_map = DefensiveActionsMap(defensive, match_info)
-            fig, ax = def_map.plot()
-            st.pyplot(fig)
-            plt.close(fig)
-        else:
-            st.info("No defensive action data available")
+        from pitch_viz import DefensiveActionsMap
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown(f"**{match_info.home_team_name}**")
+            home_defensive = defensive[defensive['is_home'] == True]
+            if len(home_defensive) > 0:
+                def_map = DefensiveActionsMap(home_defensive, match_info.home_team_name)
+                fig, ax = def_map.plot()
+                st.pyplot(fig)
+                plt.close(fig)
+            else:
+                st.info("No defensive actions")
+
+        with col2:
+            st.markdown(f"**{match_info.away_team_name}**")
+            away_defensive = defensive[defensive['is_home'] == False]
+            if len(away_defensive) > 0:
+                def_map = DefensiveActionsMap(away_defensive, match_info.away_team_name)
+                fig, ax = def_map.plot()
+                st.pyplot(fig)
+                plt.close(fig)
+            else:
+                st.info("No defensive actions")
 
     # Shot details table
     st.divider()
@@ -759,7 +698,7 @@ def show_match_analysis(events_df, match_info):
         st.dataframe(shot_display, use_container_width=True, hide_index=True)
 
 
-def show_match_overview(api, events_df, match_info, match_id, match_stats=None):
+def show_match_overview(api, events_df, match_info, match_id):
     """Display the full match overview one-pager"""
     import tempfile
     import os
@@ -771,9 +710,8 @@ def show_match_overview(api, events_df, match_info, match_id, match_stats=None):
     if st.button("Generate Full Report", type="primary"):
         with st.spinner("Generating match overview... This may take a moment."):
             try:
-                # Fetch match stats for accurate possession data (already loaded for uploaded files)
-                if match_stats is None:
-                    match_stats = fetch_match_stats(api, match_id)
+                # Fetch match stats for accurate possession data
+                match_stats = fetch_match_stats(api, match_id)
 
                 # Create the match overview with real stats
                 overview = MatchOverview(events_df, match_info, match_stats)
@@ -853,7 +791,7 @@ def show_match_overview(api, events_df, match_info, match_id, match_stats=None):
                 """)
 
 
-def show_phase_report(api, events_df, match_info, match_id, match_stats=None):
+def show_phase_report(api, events_df, match_info, match_id):
     """Display the phase-by-phase match report (7 pages)"""
     import re
     from io import BytesIO
@@ -932,9 +870,8 @@ def show_phase_report(api, events_df, match_info, match_id, match_stats=None):
     if st.button("Generate Phase Report", type="primary"):
         with st.spinner("Generating phase analysis... This may take a moment."):
             try:
-                # Fetch match stats (already loaded for uploaded files)
-                if match_stats is None:
-                    match_stats = fetch_match_stats(api, match_id)
+                # Fetch match stats
+                match_stats = fetch_match_stats(api, match_id)
 
                 # Create the phase report
                 report = FullPhaseReport(events_df, match_info, match_stats)
@@ -1086,7 +1023,7 @@ def show_player_analysis(api, events_df, match_info, match_id):
 
     # Player header
     st.divider()
-    st.subheader(f"📊 {aggregator.player_info.player_name}")
+    st.subheader(aggregator.player_info.player_name)
     st.caption(f"{aggregator.player_info.team_name}")
 
     # Summary stats
@@ -1392,9 +1329,9 @@ def show_scout_report(api, aggregator, player_info, tournament_id, stats):
                         if content.takeaways:
                             for takeaway in content.takeaways:
                                 if takeaway.is_positive:
-                                    st.success(f"✓ {takeaway.text}")
+                                    st.success(takeaway.text)
                                 else:
-                                    st.warning(f"⚠ {takeaway.text}")
+                                    st.warning(takeaway.text)
 
                         st.divider()
 

@@ -543,8 +543,10 @@ class DefensiveActionsMap:
             'Save': 'D'
         }
         
-        # Plot each action type
-        for action_type in self.defensive['action_type'].unique():
+        # Plot each action type, in a fixed order so legends match across charts
+        present = list(self.defensive['action_type'].unique())
+        ordered = [t for t in action_colors if t in present] + [t for t in present if t not in action_colors]
+        for action_type in ordered:
             actions = self.defensive[self.defensive['action_type'] == action_type]
             
             ax.scatter(
